@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Flappy Bird - Versi Skin</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      background: skyblue;
+      font-family: Arial;
+    }
+
+    .skin-selector {
+      margin-top: 40px;
+    }
+
+    .skin-img {
+      width: 60px;
+      height: 60px;
+      margin: 10px;
+      border: 3px solid transparent;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .skin-img:hover {
+      border-color: gold;
+    }
+
+    .skin-img.selected {
+      border-color: red;
+    }
+
+    .play-btn {
+      margin-top: 30px;
+      padding: 15px 30px;
+      font-size: 20px;
+      background: green;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    #scoreDisplay, #fpsDisplay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 1px 1px black;
+    }
+
+    #fpsDisplay {
+      top: 40px;
+    }
+
+    #restartBtn, #homeBtn {
+      display: none;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 15px 30px;
+      font-size: 18px;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    #restartBtn {
+      top: 55%;
+      background: red;
+    }
+
+    #homeBtn {
+      top: 65%;
+      background: #333;
+    }
+
+    canvas {
+      display: none;
+      margin: auto;
+      border: 2px solid black;
+      max-width: 100%;
+      height: auto;
+    }
+
+    @media (max-width: 500px) {
+      .skin-img {
+        width: 50px;
+        height: 50px;
+      }
+
+      .play-btn {
+        font-size: 16px;
+        padding: 10px 20px;
+      }
+
+      #restartBtn, #homeBtn {
+        font-size: 16px;
+        padding: 10px 20px;
+      }
+
+      #scoreDisplay, #fpsDisplay {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="skinMenu" class="skin-selector">
+    <h2>Pilih Skin Burung</h2>
+    <img src="burung1.png" class="skin-img selected" onclick="selectSkin(this, 'burung1.png')">
+    <img src="burung2.png" class="skin-img" onclick="selectSkin(this, 'burung2.png')">
+    <img src="burung3.png" class="skin-img" onclick="selectSkin(this, 'burung3.png')">
+    <br>
+    <button class="play-btn" onclick="startGame()">PLAY</button>
+  </div>
+
+  <div id="scoreDisplay">Score: 0</div>
+  <div id="fpsDisplay">FPS: 0</div>
+  <button id="restartBtn" onclick="restartGame()">Restart</button>
+  <button id="homeBtn" onclick="goHome()">Home</button>
+
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+  <script>
+    let selectedSkin = "burung1.png";
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const playerImg = new Image();
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const fpsDisplay = document.getElementById("fpsDisplay");
+    const restartBtn = document.getElementById("restartBtn");
+    const homeBtn = document.getElementById("homeBtn");
+
+    let gameStarted = false;
+    let gameOver = false;
+    let score = 0;
+    let pipes = [];
+    let lastFrameTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+    let pipeTimer = 0;
+    let pipeInterval = 90;
+
+    const player = {
+      x: 100,
+      y: 200,
+      width: 40,
+      height: 40,
+      velocity: 0,
+      gravity: 0.5,
+      jumpStrength: -8
+    };
+
+    function selectSkin(el, skinFile) {
+      selectedSkin = skinFile;
+      document.querySelectorAll(".skin-img").forEach(img => img.classList.remove("selected"));
+      el.classList.add("selected");
+    }
+
+    function startGame() {
+      document.getElementById("skinMenu").style.display = "none";
+      canvas.style.display = "block";
+      restartBtn.style.display = "none";
+      homeBtn.style.display = "none";
+
+      // RESPONSIVE canvas
+      canvas.width = window.innerWidth > 400 ? 400 : window.innerWidth - 20;
+      canvas.height = canvas.width * 1.5;
+
+      playerImg.src = selectedSkin;
+      playerImg.onload = () => {
+        resetGame();
+        gameLoop();
+      };
+    }
+
+    function resetGame() {
+      player.y = 200;
+      player.velocity = 0;
+      pipes = [];
+      score = 0;
+      gameOver = false;
+      pipeTimer = 0;
+      addPipe();
+    }
+
+    function goHome() {
+      gameStarted = false;
+      gameOver = false;
+      document.getElementById("skinMenu").style.display = "block";
+      canvas.style.display = "none";
+      restartBtn.style.display = "none";
+      homeBtn.style.display = "none";
+      scoreDisplay.textContent = "Score: 0";
+      fpsDisplay.textContent = "FPS: 0";
+    }
+
+    function addPipe() {
+      const gap = 150;
+      const topHeight = Math.random() * 180 + 70;
+      const pipeWidth = 50;
+      pipes.push({
+        x: canvas.width,
+        width: pipeWidth,
+        top: topHeight,
+        bottom: canvas.height - (topHeight + gap),
+        passed: false
+      });
+    }
+
+    function update() {
+      if (gameOver) return;
+
+      player.velocity += player.gravity;
+      player.y += player.velocity;
+
+      if (player.y + player.height > canvas.height || player.y < 0) {
+        gameOver = true;
+        restartBtn.style.display = "block";
+        homeBtn.style.display = "block";
+        return;
+      }
+
+      pipeTimer++;
+      if (pipeTimer >= pipeInterval) {
+        addPipe();
+        pipeTimer = 0;
+      }
+
+      pipes.forEach(pipe => {
+        pipe.x -= 2;
+
+        if (
+          player.x < pipe.x + pipe.width &&
+          player.x + player.width > pipe.x &&
+          (player.y < pipe.top || player.y + player.height > canvas.height - pipe.bottom)
+        ) {
+          gameOver = true;
+          restartBtn.style.display = "block";
+          homeBtn.style.display = "block";
+        }
+
+        if (!pipe.passed && pipe.x + pipe.width < player.x) {
+          score++;
+          pipe.passed = true;
+        }
+      });
+
+      pipes = pipes.filter(pipe => pipe.x + pipe.width > 0);
+      scoreDisplay.textContent = "Score: " + score;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#70c5ce";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "green";
+      pipes.forEach(pipe => {
+        ctx.fillRect(pipe.x, 0, pipe.width, pipe.top);
+        ctx.fillRect(pipe.x, canvas.height - pipe.bottom, pipe.width, pipe.bottom);
+      });
+
+      ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+    }
+
+    function gameLoop(timestamp) {
+      if (!gameStarted) gameStarted = true;
+
+      let delta = timestamp - lastFrameTime;
+      lastFrameTime = timestamp;
+      frameCount++;
+      if (frameCount % 10 === 0) {
+        fps = Math.round(1000 / delta);
+        fpsDisplay.textContent = "FPS: " + fps;
+      }
+
+      update();
+      draw();
+
+      if (!gameOver) requestAnimationFrame(gameLoop);
+    }
+
+    function restartGame() {
+      resetGame();
+      restartBtn.style.display = "none";
+      homeBtn.style.display = "none";
+      gameLoop();
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && !gameOver) {
+        player.velocity = player.jumpStrength;
+      }
+    });
+
+    window.addEventListener("mousedown", () => {
+      if (!gameOver) {
+        player.velocity = player.jumpStrength;
+      }
+    });
+  </script>
+</body>
+</html>
